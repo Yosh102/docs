@@ -58,12 +58,12 @@
     "global": {
       "anchors": [
         {
-          "anchor": "PLAY TUNEオフィシャルサイト",
+          "anchor": "Official Page",
           "href": "https://playtune.jp",
           "icon": "house"
         },
         {
-          "anchor": "PLAY TUNE Developer Portal",
+          "anchor": "Developer Portal",
           "href": "https://account.playtune.jp",
           "icon": "code"
         }
