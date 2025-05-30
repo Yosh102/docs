@@ -77,13 +77,13 @@
   "navbar": {
     "links": [
       {
-        "label": "Support",
+        "label": "お問い合わせ",
         "href": "mailto:contact@playtune.jp"
       }
     ],
     "primary": {
       "type": "button",
-      "label": "Dashboard",
+      "label": "Developer Portal",
       "href": "https://account.playtune.jp"
     }
   },
