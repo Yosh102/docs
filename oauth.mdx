@@ -4,3 +4,539 @@ description: "OAuth 2.0およびOpenID Connectプロトコルに準拠したAPI�
 version: "v1"
 baseUrl: "https://account.playtune.jp/v1/api/"
 ---
+
+## 概要
+
+PlayTune では、OAuth 2.0 および OpenID Connect プロトコルに準拠したAPIを提供しています。このAPIを使用することで、サードパーティアプリケーションがユーザーの同意を得て、PlayTuneのリソースに安全にアクセスできます。
+
+<info>
+  **ベースURL**: `https://account.playtune.jp/v1/api/`
+</info>
+
+---
+
+## 認可エンドポイント
+
+### GET
+
+ `/oauth/authorize`
+
+OAuth認可フローの開始点です。ユーザーをPlayTuneの認証画面にリダイレクトし、アプリケーションへのアクセス許可を求めます。
+
+<warning>
+  本番環境ではPKCE（`code_challenge`）の使用を強く推奨します。
+</warning>
+
+#### Parameters
+
+| Parameter               | Required    | Type     | Description                    |
+| ----------------------- | ----------- | -------- | ------------------------------ |
+| `response_type`         | Required    | `string` | `code` (認可コードフロー)              |
+| `client_id`             | Required    | `string` | 登録済みクライアントID                   |
+| `redirect_uri`          | Required    | `string` | 認可後のリダイレクト先URL                 |
+| `scope`                 | Required    | `string` | リクエストするスコープ（スペース区切り）           |
+| `state`                 | Recommended | `string` | CSRF攻撃防止用のランダム文字列              |
+| `code_challenge`        | Recommended | `string` | PKCE用チャレンジコード（Base64URL エンコード） |
+| `code_challenge_method` | Recommended | `string` | `S256` または `plain`             |
+| `nonce`                 | Optional    | `string` | OpenID Connect用のランダム文字列        |
+
+#### Request Example
+
+<Code language="http">
+  {`GET /oauth/authorize?response_type=code&client_id=abc123&redirect_uri=https%3A%2F%2Fyourapp.com%2Fcallback&scope=openid%20profile%20email&state=xyz&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256 HTTP/1.1
+  Host: account.playtune.jp`}
+</Code>
+
+#### Success Response
+
+ユーザーが認可を承認すると、指定された`redirect_uri`にリダイレクトされます：
+
+<Code language="text">
+  {`https://yourapp.com/callback?code=SplxlOBeZQQYbYS6WxSbIA&state=xyz`}
+</Code>
+
+#### Error Response
+
+<Code language="text">
+  {`https://yourapp.com/callback?error=access_denied&error_description=The%20user%20denied%20the%20request&state=xyz`}
+</Code>
+
+#### Error Codes
+
+| Error Code                  | Description        |
+| --------------------------- | ------------------ |
+| `invalid_request`           | 必須パラメータが不足または無効    |
+| `unauthorized_client`       | クライアントが認可されていない    |
+| `access_denied`             | ユーザーがアクセスを拒否       |
+| `unsupported_response_type` | サポートされていないレスポンスタイプ |
+| `invalid_scope`             | 無効なスコープ            |
+| `server_error`              | サーバー内部エラー          |
+
+---
+
+## トークンエンドポイント
+
+### POST
+
+ `/oauth/token`
+
+認可コードをアクセストークンと交換、またはリフレッシュトークンで新しいアクセストークンを取得します。
+
+<info>
+  **Content-Type**: `application/x-www-form-urlencoded`
+</info>
+
+#### 認可コードフロー
+
+認可コードをアクセストークンと交換します。
+
+#### Parameters
+
+| Parameter       | Required     | Type     | Description              |
+| --------------- | ------------ | -------- | ------------------------ |
+| `grant_type`    | Required     | `string` | `authorization_code`     |
+| `code`          | Required     | `string` | 認可エンドポイントから取得した認可コード     |
+| `redirect_uri`  | Required     | `string` | 認可時と同じリダイレクトURL          |
+| `code_verifier` | Recommended  | `string` | PKCE用検証コード               |
+| `client_id`     | Required     | `string` | クライアントID                 |
+| `client_secret` | Confidential | `string` | クライアントシークレット（機密クライアントのみ） |
+
+#### Request Example
+
+**Basic認証を使用**:
+
+<Code language="bash">
+  {`curl -X POST https://account.playtune.jp/v1/api/oauth/token \\
+  -H "Content-Type: application/x-www-form-urlencoded" \\
+  -H "Authorization: Basic $(echo -n 'client_id:client_secret' | base64)" \\
+  -d "grant_type=authorization_code" \\
+  -d "code=SplxlOBeZQQYbYS6WxSbIA" \\
+  -d "redirect_uri=https://yourapp.com/callback" \\
+  -d "code_verifier=dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"`}
+</Code>
+
+**POSTパラメータを使用**:
+
+<Code language="bash">
+  {`curl -X POST https://account.playtune.jp/v1/api/oauth/token \\
+  -H "Content-Type: application/x-www-form-urlencoded" \\
+  -d "grant_type=authorization_code" \\
+  -d "code=SplxlOBeZQQYbYS6WxSbIA" \\
+  -d "redirect_uri=https://yourapp.com/callback" \\
+  -d "code_verifier=dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk" \\
+  -d "client_id=your_client_id" \\
+  -d "client_secret=your_client_secret"`}
+</Code>
+
+#### Success Response
+
+<Code language="json">
+  {`{
+  "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "Bearer",
+  "expires_in": 300,
+  "refresh_token": "rt.a1b2c3d4e5f6g7h8i9j0",
+  "scope": "openid profile email",
+  "id_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+  }`}
+</Code>
+
+#### リフレッシュトークンフロー
+
+リフレッシュトークンを使用して新しいアクセストークンを取得します。
+
+<warning>
+  セキュリティ向上のため、リフレッシュトークン使用時に新しいリフレッシュトークンが発行されます（リフレッシュトークンローテーション）。
+</warning>
+
+#### Parameters
+
+| Parameter       | Required     | Type     | Description              |
+| --------------- | ------------ | -------- | ------------------------ |
+| `grant_type`    | Required     | `string` | `refresh_token`          |
+| `refresh_token` | Required     | `string` | 有効なリフレッシュトークン            |
+| `client_id`     | Required     | `string` | クライアントID                 |
+| `client_secret` | Confidential | `string` | クライアントシークレット（機密クライアントのみ） |
+
+#### Request Example
+
+<Code language="bash">
+  {`curl -X POST https://account.playtune.jp/v1/api/oauth/token \\
+  -H "Content-Type: application/x-www-form-urlencoded" \\
+  -H "Authorization: Basic $(echo -n 'client_id:client_secret' | base64)" \\
+  -d "grant_type=refresh_token" \\
+  -d "refresh_token=rt.a1b2c3d4e5f6g7h8i9j0"`}
+</Code>
+
+#### Success Response
+
+<Code language="json">
+  {`{
+  "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "Bearer",
+  "expires_in": 300,
+  "refresh_token": "rt.k1l2m3n4o5p6q7r8s9t0"
+  }`}
+</Code>
+
+#### Error Response
+
+<Code language="json">
+  {`{
+  "error": "invalid_grant",
+  "error_description": "The provided authorization grant is invalid."
+  }`}
+</Code>
+
+#### Error Codes
+
+| Error Code               | Description           |
+| ------------------------ | --------------------- |
+| `invalid_request`        | 必須パラメータが不足または無効       |
+| `invalid_client`         | クライアント認証失敗            |
+| `invalid_grant`          | 無効な認可コードまたはリフレッシュトークン |
+| `unsupported_grant_type` | サポートしていないグラントタイプ      |
+| `invalid_scope`          | 無効なスコープ               |
+
+#### Advanced Features
+
+<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+<div className="p-4 border rounded-lg">
+<h4 className="font-semibold mb-2">
+mTLS認証</h4>
+
+
+<p className="text-sm">
+クライアント証明書をX-Client-Certヘッダーで送信可能</p>
+
+</div>
+
+<div className="p-4 border rounded-lg">
+<h4 className="font-semibold mb-2">
+DPoP</h4>
+
+
+<p className="text-sm">
+DPoPヘッダーでProof-of-Possessionを送信可能</p>
+
+</div>
+
+</div>
+
+---
+
+## ユーザー情報エンドポイント
+
+### GET
+
+ `/oauth/userinfo`
+
+OpenID Connect準拠のユーザー情報を取得します。
+
+<info>
+  **認証**: Bearer Token（アクセストークン）
+</info>
+
+#### Required Scopes
+
+以下のいずれかのスコープが必要です：
+
+<div className="flex flex-wrap gap-2 mt-2">
+openid
+
+
+profile
+
+
+email
+
+
+user.profile.name
+
+
+user.profile.email
+
+</div>
+
+#### Request Example
+
+<Code language="bash">
+  {`curl -X GET https://account.playtune.jp/v1/api/oauth/userinfo \\
+  -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."`}
+</Code>
+
+#### Success Response
+
+<Code language="json">
+  {`{
+  "sub": "user123456789",
+  "email": "user@example.com",
+  "email_verified": true,
+  "name": "田中太郎",
+  "preferred_username": "tanaka"
+  }`}
+</Code>
+
+#### Response Fields
+
+| Field                | Type      | Description | Required Scope                 |
+| -------------------- | --------- | ----------- | ------------------------------ |
+| `sub`                | `string`  | ユーザーの一意識別子  | `openid`                       |
+| `email`              | `string`  | メールアドレス     | `email`, `user.profile.email`  |
+| `email_verified`     | `boolean` | メール認証済みかどうか | `email`, `user.profile.email`  |
+| `name`               | `string`  | 表示名         | `profile`, `user.profile.name` |
+| `preferred_username` | `string`  | 推奨ユーザー名     | `profile`, `user.profile.name` |
+
+#### Error Response
+
+<Code language="json">
+  {`{
+  "error": "insufficient_scope",
+  "error_description": "The request requires profile access scope"
+  }`}
+</Code>
+
+---
+
+## JWKSエンドポイント
+
+### GET
+
+ `/.well-known/jwks.json`
+
+JWT署名検証用の公開鍵セットを取得します。
+
+<info>
+  このエンドポイントは1時間キャッシュされます。
+</info>
+
+#### Request Example
+
+<Code language="bash">
+  {`curl -X GET https://account.playtune.jp/v1/api/.well-known/jwks.json`}
+</Code>
+
+#### Success Response
+
+<Code language="json">
+  {`{
+  "keys": [
+    {
+      "kty": "RSA",
+      "kid": "key-id-2024-1",
+      "use": "sig",
+      "alg": "RS256",
+      "n": "0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISPZjhQ_4n3_HBjc3YnCZLKSwE",
+      "e": "AQAB"
+    }
+  ]
+  }`}
+</Code>
+
+#### Response Fields
+
+| Field  | Type     | Description                  |
+| ------ | -------- | ---------------------------- |
+| `keys` | `array`  | JWKの配列                       |
+| `kty`  | `string` | キータイプ（RSA）                   |
+| `kid`  | `string` | キーID（JWT header の `kid` と一致） |
+| `use`  | `string` | キー用途（`sig` = 署名用）            |
+| `alg`  | `string` | アルゴリズム（RS256）                |
+| `n`    | `string` | RSA公開鍵のモジュラス                 |
+| `e`    | `string` | RSA公開鍵の指数                    |
+
+---
+
+## PAR (Pushed Authorization Request) エンドポイント
+
+### POST
+
+ `/oauth/par`
+
+認可リクエストを事前にプッシュしてセキュリティを強化します。
+
+<info>
+  **Content-Type**: `application/x-www-form-urlencoded`\
+  **認証**: Basic認証またはPOSTパラメータ
+</info>
+
+#### Parameters
+
+| Parameter               | Required     | Type     | Description  |
+| ----------------------- | ------------ | -------- | ------------ |
+| `response_type`         | Required     | `string` | `code`       |
+| `redirect_uri`          | Required     | `string` | リダイレクトURI    |
+| `scope`                 | Required     | `string` | スコープ         |
+| `code_challenge`        | Required     | `string` | PKCEチャレンジコード |
+| `code_challenge_method` | Required     | `string` | `S256`       |
+| `state`                 | Optional     | `string` | 状態パラメータ      |
+| `nonce`                 | Optional     | `string` | ナンス          |
+| `client_id`             | Required     | `string` | クライアントID     |
+| `client_secret`         | Confidential | `string` | クライアントシークレット |
+
+#### Request Example
+
+<Code language="bash">
+  {`curl -X POST https://account.playtune.jp/v1/api/oauth/par \\
+  -H "Content-Type: application/x-www-form-urlencoded" \\
+  -H "Authorization: Basic $(echo -n 'client_id:client_secret' | base64)" \\
+  -d "response_type=code" \\
+  -d "redirect_uri=https://yourapp.com/callback" \\
+  -d "scope=openid profile email" \\
+  -d "code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM" \\
+  -d "code_challenge_method=S256" \\
+  -d "state=xyz"`}
+</Code>
+
+#### Success Response
+
+<Code language="json">
+  {`{
+  "request_uri": "urn:ietf:params:oauth:request_uri:6esc_11ACC5bwc014ltc14eY22c",
+  "expires_in": 600
+  }`}
+</Code>
+
+#### PAR後の認可リクエスト
+
+取得した`request_uri`を使用して認可エンドポイントを呼び出します：
+
+<Code language="http">
+  {`GET /oauth/authorize?client_id=abc123&request_uri=urn:ietf:params:oauth:request_uri:6esc_11ACC5bwc014ltc14eY22c HTTP/1.1
+  Host: account.playtune.jp`}
+</Code>
+
+---
+
+## トークンイントロスペクション エンドポイント
+
+### POST
+
+ `/oauth/introspect`
+
+アクセストークンまたはリフレッシュトークンの状態を検証します。
+
+<info>
+  **Content-Type**: `application/x-www-form-urlencoded`\
+  **認証**: Basic認証またはPOSTパラメータ
+</info>
+
+#### Parameters
+
+| Parameter         | Required | Type     | Description                        |
+| ----------------- | -------- | -------- | ---------------------------------- |
+| `token`           | Required | `string` | 検証するトークン                           |
+| `token_type_hint` | Optional | `string` | `access_token` または `refresh_token` |
+| `client_id`       | Required | `string` | クライアントID                           |
+| `client_secret`   | Required | `string` | クライアントシークレット                       |
+
+#### Request Example
+
+<Code language="bash">
+  {`curl -X POST https://account.playtune.jp/v1/api/oauth/introspect \\
+  -H "Content-Type: application/x-www-form-urlencoded" \\
+  -H "Authorization: Basic $(echo -n 'client_id:client_secret' | base64)" \\
+  -d "token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..." \\
+  -d "token_type_hint=access_token"`}
+</Code>
+
+#### Success Response (有効なトークン)
+
+<Code language="json">
+  {`{
+  "active": true,
+  "client_id": "abc123",
+  "scope": "openid profile email",
+  "sub": "user123456789",
+  "exp": 1728123456,
+  "iat": 1728120456,
+  "iss": "https://account.playtune.jp",
+  "aud": "abc123",
+  "token_type": "access_token"
+  }`}
+</Code>
+
+#### Success Response (無効なトークン)
+
+<Code language="json">
+  {`{
+  "active": false
+  }`}
+</Code>
+
+---
+
+## トークン失効エンドポイント
+
+### POST
+
+ `/oauth/revoke`
+
+アクセストークンまたはリフレッシュトークンを失効させます。
+
+<info>
+  **Content-Type**: `application/x-www-form-urlencoded`\
+  **認証**: Basic認証またはPOSTパラメータ
+</info>
+
+<warning>
+  RFC 7009に従い、トークンが存在しない場合でも200を返します。
+</warning>
+
+#### Parameters
+
+| Parameter         | Required | Type     | Description                        |
+| ----------------- | -------- | -------- | ---------------------------------- |
+| `token`           | Required | `string` | 失効させるトークン                          |
+| `token_type_hint` | Optional | `string` | `access_token` または `refresh_token` |
+| `client_id`       | Required | `string` | クライアントID                           |
+| `client_secret`   | Required | `string` | クライアントシークレット                       |
+
+#### Request Example
+
+<Code language="bash">
+  {`curl -X POST https://account.playtune.jp/v1/api/oauth/revoke \\
+  -H "Content-Type: application/x-www-form-urlencoded" \\
+  -H "Authorization: Basic $(echo -n 'client_id:client_secret' | base64)" \\
+  -d "token=rt.a1b2c3d4e5f6g7h8i9j0" \\
+  -d "token_type_hint=refresh_token"`}
+</Code>
+
+#### Success Response
+
+<Code language="http">
+  {`HTTP/1.1 200 OK
+  Cache-Control: no-store
+  Pragma: no-cache`}
+</Code>
+
+空のボディが返されます。
+
+---
+
+## レート制限とエラーハンドリング
+
+### Rate Limits
+
+| Endpoint           | Limit              |
+| ------------------ | ------------------ |
+| `/oauth/authorize` | 100リクエスト/分/IP      |
+| `/oauth/token`     | 60リクエスト/分/クライアント   |
+| その他                | 1000リクエスト/時/クライアント |
+
+### Common Error Codes
+
+| HTTP Status | Error Code           | Description |
+| ----------- | -------------------- | ----------- |
+| `400`       | `invalid_request`    | 不正なリクエスト    |
+| `401`       | `invalid_client`     | クライアント認証失敗  |
+| `401`       | `invalid_token`      | 無効なトークン     |
+| `403`       | `insufficient_scope` | スコープ不足      |
+| `429`       | `too_many_requests`  | レート制限超過     |
+| `500`       | `server_error`       | サーバー内部エラー   |
+
+### CORS Support
+
+<info>
+  すべてのエンドポイントでCORSプリフライトリクエスト（OPTIONS）をサポートしています。
+</info>
