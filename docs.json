@@ -2,78 +2,17 @@
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
   "name": "PLAY TUNE Developer Docs",
+  "description": "PlayTune OAuth 2.0 API and developer resources documentation",
   "colors": {
     "primary": "#363636",
     "light": "#707070",
     "dark": "#333333"
   },
-  "favicon": "/favicon.svg",
-  "navigation": {
-    "tabs": [
-      {
-        "tab": "ガイド",
-        "groups": [
-          {
-            "group": "使ってみる",
-            "pages": [
-              "index",
-              "quickstart",
-              "development"
-            ]
-          },
-          {
-            "group": "Essentials",
-            "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/settings",
-              "essentials/navigation",
-              "essentials/reusable-snippets"
-            ]
-          }
-        ]
-      },
-      {
-        "tab": "API Reference",
-        "groups": [
-          {
-            "group": "API Documentation",
-            "pages": [
-              "api-reference/introduction"
-            ]
-          },
-          {
-            "group": "Endpoint Examples",
-            "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
-            ]
-          }
-        ]
-      }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Official Page",
-          "href": "https://playtune.jp",
-          "icon": "house"
-        },
-        {
-          "anchor": "Developer Portal",
-          "href": "https://account.playtune.jp",
-          "icon": "code"
-        }
-      ]
-    }
-  },
   "logo": {
     "light": "/logo/logo.svg",
     "dark": "/logo/logo.svg"
   },
+  "favicon": "/favicon.svg",
   "navbar": {
     "links": [
       {
@@ -83,13 +22,51 @@
     ],
     "primary": {
       "type": "button",
-      "label": "Developer",
+      "label": "Console",
       "href": "https://account.playtune.jp"
     }
   },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/PLAYTUNE_JP"
+  "navigation": {
+    "groups": [
+      {
+        "group": "使ってみる",
+        "pages": [
+          "index",
+          "oauth"
+        ]
+      },
+      {
+        "group": "API Reference",
+        "pages": [
+          "api-reference/authentication",
+          "api-reference/oauth-endpoints",
+          "api-reference/resource-endpoints"
+        ]
+      }
+    ]
+  },
+  "footerSocials": {
+    "twitter": "https://x.com/PLAYTUNE_JP"
+  },
+  "anchors": [
+    {
+      "name": "Official Page",
+      "icon": "house",
+      "url": "https://playtune.jp"
+    },
+    {
+      "name": "Developer Portal",
+      "icon": "code",
+      "url": "https://account.playtune.jp"
     }
+  ],
+  "api": {
+    "baseUrl": "https://account.playtune.jp/v1/api",
+    "auth": {
+      "method": "bearer"
+    }
+  },
+  "seo": {
+    "indexHiddenPages": false
   }
 }
