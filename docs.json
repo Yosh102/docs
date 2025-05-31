@@ -32,15 +32,9 @@
         "group": "使ってみる",
         "pages": [
           "index",
-          "oauth"
-        ]
-      },
-      {
-        "group": "API Reference",
-        "pages": [
-          "api-reference/authentication",
-          "api-reference/oauth-endpoints",
-          "api-reference/resource-endpoints"
+          "application",
+          "oauth",
+          "oauth_flow"
         ]
       }
     ]
