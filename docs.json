@@ -32,9 +32,15 @@
         "group": "使ってみる",
         "pages": [
           "index",
-          "application",
+          "application"
+        ]
+      },
+      {
+        "group": "アカウント認証",
+        "pages": [
           "oauth",
-          "oauth_flow"
+          "oauth_flow",
+          "sdk"
         ]
       }
     ]
