@@ -1,529 +1,709 @@
 ---
-title: "SDK(TypeScript)"
-description: "アプリケーションに認証機能を簡単に組み込むための公式TypeScript SDKです"
+title: SDK - クイックスタートガイド
+description: "PLAY TUNE認証を素早く実装するためのステップバイステップガイド"
 ---
 
-## インストール
+import { Callout } from "@/components/callout"
 
-NPMを使用してパッケージをインストールします。
+このガイドでは、`@paradigmai/playtune-auth` SDKをReactプロジェクトにインストールし、基本的な認証フロー（ログイン、コールバック処理、ユーザー情報表示、ログアウト）を実装する手順を解説します。
+
+## 1. Prerequisite
+
+- Node.js (LTS版推奨) および npm または yarn がインストールされていること
+- Paradigm PlayTuneプラットフォームでアプリケーションを登録し、以下の情報を取得済みであること:
+  - **クライアントID (Client ID)**
+  - **リダイレクトURI (Redirect URI)**: アプリケーション登録時に指定した、認証後にPlayTuneがユーザーをリダイレクトさせるURI
+- 基本的なReactの知識
+
+<Callout type="warning">
+PlayTuneプラットフォームでのアプリケーション登録が完了していることを確認してください。登録されていないクライアントIDでは認証フローが開始できません。
+</Callout>
+
+## 2. Create a React project (optional)
+
+既存のReactプロジェクトがない場合は、新しいプロジェクトを作成します。ここでは `create-react-app` (TypeScriptテンプレート) を使用する例を示します。
+
+```bash
+npx create-react-app my-playtune-app --template typescript
+cd my-playtune-app
+```
+
+または Vite を使用する場合:
+
+```bash
+npm create vite@latest my-playtune-app -- --template react-ts
+cd my-playtune-app
+npm install # 依存関係をインストール
+```
+
+<Callout>
+Viteの方が高速な開発体験を提供しますが、どちらのツールでもSDKは正常に動作します。
+</Callout>
+
+## 3. Installation
+
+作成したプロジェクト、または既存のプロジェクトに `@paradigmai/playtune-auth` SDKをインストールします。
 
 ```bash
 npm install @paradigmai/playtune-auth
+# または
+yarn add @paradigmai/playtune-auth
 ```
 
-## 基本的な使用方法
+また、ルーティングのために `react-router-dom` もインストールしておくと便利です。
 
-基本的な認証フローの実装例です。
+```bash
+npm install react-router-dom
+# TypeScript用の型定義も必要な場合（最新バージョンでは通常不要）
+npm install @types/react-router-dom --save-dev
+```
+
+## 4.  Configure `AuthProvider`
+
+SDKの機能を利用するために、アプリケーションのルートに近いコンポーネント（例: `src/index.tsx` または `src/App.tsx`）を `AuthProvider` でラップします。
+
+### 設定ファイルの作成
+
+まず、`src` フォルダに `authConfig.ts` というファイルを作成し、設定を記述します。
 
 ```typescript
-import { PlaytuneAuth } from '@paradigmai/playtune-auth';
+// src/authConfig.ts
+import type { AuthConfig } from "@paradigmai/playtune-auth";
 
-// 1. PlaytuneAuthインスタンスの初期化
-const auth = new PlaytuneAuth({
-  clientId: 'YOUR_CLIENT_ID', // あなたのクライアントID
-  issuer: 'https://auth.yourdomain.com', // Playtune認証サーバーのURL
-  redirectUri: 'https://yourapp.com/callback', // アプリケーションのコールバックURL
-  scopes: ['openid', 'profile', 'email'] // 要求するスコープ
-});
-
-async function initiateLogin() {
-  // 2. ログインフローを開始
-  const loginUrl = await auth.login();
-  window.location.href = loginUrl; // 認証サーバーへリダイレクト
-}
-
-async function handleAuthCallback() {
-  // 3. 認証コールバックを処理 (リダイレクトURIのページで実行)
-  if (window.location.search.includes('code=')) {
-    try {
-      const tokens = await auth.handleCallback(window.location.href);
-      console.log('認証成功:', tokens);
-      // 認証後の処理 (例: ユーザー情報を取得、ダッシュボードへリダイレクト)
-      await fetchUserInfo();
-    } catch (error) {
-      console.error('認証コールバックエラー:', error);
-    }
-  }
-}
-
-async function fetchUserInfo() {
-  // 4. ユーザー情報を取得
-  try {
-    const user = await auth.getUserInfo();
-    console.log('ユーザー情報:', user);
-  } catch (error) {
-    console.error('ユーザー情報取得エラー:', error);
-  }
-}
-
-async function getApiToken() {
-  // 5. API呼び出し用のアクセストークンを取得
-  try {
-    const accessToken = await auth.getAccessToken();
-    console.log('アクセストークン:', accessToken);
-    // このアクセストークンをAPIリクエストのAuthorizationヘッダーに使用
-  } catch (error) {
-    console.error('アクセストークン取得エラー:', error);
-  }
-}
-
-async function performLogout() {
-  // 6. ログアウト
-  try {
-    await auth.logout();
-    console.log('ログアウト成功');
-    // ログインページへリダイレクトなど
-  } catch (error) {
-    console.error('ログアウトエラー:', error);
-  }
-}
-
-// 実行例
-// initiateLogin(); // ログインボタンクリック時など
-// handleAuthCallback(); // コールバックページ読み込み時
+export const authConfig: AuthConfig = {
+  clientId: "YOUR_PLAYTUNE_CLIENT_ID", // 取得したクライアントIDに置き換えてください
+  redirectUri: "http://localhost:3000/callback", // PlayTuneに登録したリダイレクトURIに置き換えてください
+  baseUrl: "https://account.playtune.jp/v1/api", // PlayTuneのOAuthサーバーベースURL
+  defaultScope: "openid profile email offline_access paradigm.role", // 要求するスコープ
+  storage: "indexedDB", // 推奨: セキュアな暗号化ストレージ
+  dpopBoundAccessTokens: true, // PlayTuneがDPoPを要求する場合
+  usePkce: true, // セキュリティ強化のため必須
+};
 ```
 
-## 詳細仕様
+<Callout type="info">
+**ストレージオプションについて:**
+- `localStorage`: 最もシンプルだが、XSS攻撃に脆弱
+- `sessionStorage`: ブラウザセッション終了時に自動削除
+- `indexedDB`: AES-GCM暗号化でトークンを保護（推奨）
+</Callout>
 
-### `AuthConfig` 設定オプション
+### AuthProviderの設定
 
-`PlaytuneAuth` インスタンスを作成する際に渡す設定オブジェクトです。
+次に、`src/index.tsx` (Create React Appの場合) または `src/main.tsx` (Viteの場合) を編集します。
 
-```typescript
-interface AuthConfig {
-  /** OAuthクライアントID */
-  clientId: string;
-  /** 認証サーバーのベースURL (例: https://auth.yourdomain.com) */
-  issuer: string;
-  /** アプリケーションのOAuthコールバックURI */
-  redirectUri: string;
-  /** 要求するスコープ (デフォルト: ['openid']) */
-  scopes?: string[];
-  /** レスポンスタイプ (現在サポートされているのは 'code' のみ) */
-  responseType?: 'code';
-  /** カスタムHTTPクライアント (オプション) */
-  httpClient?: HttpClient;
-  /** トークンストレージ実装 (デフォルト: ブラウザ環境ではlocalStorage, Node.jsではメモリ) */
-  storage?: TokenStorage;
-  /** デバッグログをコンソールに出力するかどうか (デフォルト: false) */
-  debug?: boolean;
-  /** DPoP (Demonstrating Proof-of-Possession) を有効にするかどうか (デフォルト: false) */
-  enableDPoP?: boolean;
-  /** トークン要求時のカスタムオーディエンス (オプション) */
-  audience?: string;
-}
-```
-
-### `LoginOptions` ログインオプション
-
-`auth.login()` メソッドに渡すことができるオプションです。
-
-```typescript
-interface LoginOptions {
-  /** 認証リクエストに追加するスコープ */
-  additionalScopes?: string[];
-  /** ログインヒント (例: ユーザーのメールアドレス) */
-  loginHint?: string;
-  /** 認証プロンプトの挙動を指定 */
-  prompt?: 'none' | 'login' | 'consent' | 'select_account';
-  /** ユーザーが最後に認証されてからの最大許容時間 (秒) */
-  maxAge?: number;
-  /** 認証UIの表示言語 (例: 'ja-JP') */
-  uiLocales?: string;
-  /** 要求する認証コンテキストクラス参照値 (ACR) */
-  acrValues?: string;
-  /** カスタムstateパラメータ (指定しない場合はSDKが自動生成) */
-  state?: string;
-}
-```
-
-## 実装サンプル
-
-### React での使用
-
-Reactアプリケーションでは、`AuthProvider`と`useAuth`フックを使用して簡単に認証機能を組み込めます。
-
-**1. `AuthProvider` でアプリケーションをラップ**
+**Create React App (`src/index.tsx`):**
 
 ```tsx
-// src/main.tsx または src/App.tsx
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import './index.css';
 import App from './App';
-import { AuthProvider } from '@paradigmai/playtune-auth/react';
+import reportWebVitals from './reportWebVitals';
+import { AuthProvider } from '@paradigmai/playtune-auth';
+import { authConfig } from './authConfig'; // 作成した設定ファイルをインポート
+import { BrowserRouter } from 'react-router-dom';
 
-const authConfig = {
-  clientId: process.env.REACT_APP_PLAYTUNE_CLIENT_ID!,
-  issuer: process.env.REACT_APP_PLAYTUNE_ISSUER!,
-  redirectUri: `${window.location.origin}/callback`, // コールバックページのパスに合わせて調整
-  scopes: ['openid', 'profile', 'email'],
-  debug: process.env.NODE_ENV === 'development',
-};
+const root = ReactDOM.createRoot(
+  document.getElementById('root') as HTMLElement
+);
+
+root.render(
+  <React.StrictMode>
+    <BrowserRouter>
+      <AuthProvider config={authConfig}>
+        <App />
+      </AuthProvider>
+    </BrowserRouter>
+  </React.StrictMode>
+);
+
+reportWebVitals();
+```
+
+**Vite (`src/main.tsx`):**
+
+```tsx
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import App from './App.tsx'
+import './index.css'
+import { AuthProvider } from '@paradigmai/playtune-auth'
+import { authConfig } from './authConfig.ts' // 作成した設定ファイルをインポート
+import { BrowserRouter } from 'react-router-dom'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <AuthProvider config={authConfig}>
-      <App />
-    </AuthProvider>
-  </React.StrictMode>
-);
+    <BrowserRouter>
+      <AuthProvider config={authConfig}>
+        <App />
+      </AuthProvider>
+    </BrowserRouter>
+  </React.StrictMode>,
+)
 ```
 
-**2. コンポーネントで `useAuth` フックを使用**
+<Callout type="warning">
+`AuthProvider` は必ずSDKのフックを使用するすべてのコンポーネントより上位に配置してください。React Contextの仕様により、Provider外でフックを使用するとエラーが発生します。
+</Callout>
+
+## 5. Create Authentication Callback Processing Component
+
+PlayTuneからのリダイレクトを受け取り、認証コードをトークンと交換するコンポーネントを作成します。
+
+まず、`src/components` フォルダを作成し、その中に `AuthCallback.tsx` というファイルを作成します。
 
 ```tsx
-// src/components/UserProfile.tsx
-import { useAuth } from '@paradigmai/playtune-auth/react';
+// src/components/AuthCallback.tsx
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@paradigmai/playtune-auth';
 
-function UserProfile() {
-  const { user, isAuthenticated, isLoading, login, logout, getAccessToken, error } = useAuth();
+const AuthCallback: React.FC = () => {
+  const { handleRedirect, isLoading: authLoading, error: authError } = useAuth();
+  const navigate = useNavigate();
+  const [error, setError] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  if (isLoading) {
-    return <div>読み込み中...</div>;
-  }
+  useEffect(() => {
+    const processRedirect = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      
+      // PlayTuneからのエラーレスポンスをチェック
+      if (urlParams.has("error")) {
+        const errorCode = urlParams.get("error");
+        const errorDescription = urlParams.get("error_description");
+        setError(`認証エラー: ${errorDescription || errorCode}`);
+        return;
+      }
 
-  if (error) {
-    return <div>認証エラー: {error.message}</div>;
-  }
+      // 認証コードがある場合のみ処理を実行
+      if (urlParams.has("code")) {
+        setIsProcessing(true);
+        try {
+          console.log("認証コールバックを処理中...");
+          const user = await handleRedirect();
+          console.log("認証成功:", user);
+          
+          // 成功後、ホームページにリダイレクト
+          navigate('/', { replace: true });
+        } catch (err: any) {
+          console.error("認証コールバック処理エラー:", err);
+          setError(err.message || '認証処理に失敗しました。');
+        } finally {
+          setIsProcessing(false);
+        }
+      } else {
+        // codeもerrorもない場合は不正なアクセス
+        console.warn("無効なコールバックアクセス");
+        navigate('/', { replace: true });
+      }
+    };
 
-  if (!isAuthenticated) {
+    // AuthProviderの初期化完了後に処理を開始
+    if (!authLoading) {
+      processRedirect();
+    }
+  }, [handleRedirect, navigate, authLoading]);
+
+  if (authLoading) {
     return (
-      <div>
-        <p>ログインしていません。</p>
-        <button onClick={() => login()}>ログイン</button>
+      <div style={{ textAlign: 'center', padding: '50px' }}>
+        <p>認証システムを初期化中...</p>
       </div>
     );
   }
 
-  const callApi = async () => {
+  if (error || authError) {
+    return (
+      <div style={{ textAlign: 'center', padding: '50px' }}>
+        <h2>認証エラー</h2>
+        <p style={{ color: 'red' }}>{error || authError?.message}</p>
+        <button 
+          onClick={() => navigate('/')}
+          style={{ marginTop: '20px', padding: '10px 20px' }}
+        >
+          ホームに戻る
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ textAlign: 'center', padding: '50px' }}>
+      <p>{isProcessing ? 'ログイン処理中...' : 'ログイン情報を確認中...'}</p>
+      <div style={{ margin: '20px 0' }}>
+        {/* シンプルなローディングアニメーション */}
+        <div style={{ 
+          border: '3px solid #f3f3f3', 
+          borderTop: '3px solid #3498db', 
+          borderRadius: '50%', 
+          width: '30px', 
+          height: '30px', 
+          animation: 'spin 1s linear infinite',
+          margin: '0 auto'
+        }} />
+      </div>
+    </div>
+  );
+};
+
+export default AuthCallback;
+```
+
+<Callout type="info">
+`handleRedirect()` メソッドは認証コードをアクセストークンに交換し、ユーザー情報を取得して認証状態を更新します。このプロセスは自動的にPKCE検証とstate検証を含みます。
+</Callout>
+
+## 6. Create Login/User Information Display/Logout Component
+
+ユーザーにログイン/ログアウトボタンを提供し、ログイン時にはユーザー情報を表示するコンポーネントを作成します。
+
+`src/components` フォルダに `UserProfile.tsx` というファイルを作成します。
+
+```tsx
+// src/components/UserProfile.tsx
+import React, { useState } from 'react';
+import { useAuth, useAccessToken } from '@paradigmai/playtune-auth';
+
+const UserProfile: React.FC = () => {
+  const { user, login, logout, isLoading, error } = useAuth();
+  const { token: accessToken, loading: tokenLoading } = useAccessToken();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleLogin = async () => {
     try {
-      const token = await getAccessToken();
-      const response = await fetch('https://api.yourdomain.com/data', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      await login({
+        scope: "openid profile email offline_access paradigm.role"
       });
-      const data = await response.json();
-      console.log('APIレスポンス:', data);
-      alert('API呼び出し成功！');
-    } catch (apiError) {
-      console.error('API呼び出しエラー:', apiError);
-      alert('API呼び出しに失敗しました。');
+    } catch (err: any) {
+      console.error("ログイン開始エラー:", err);
     }
   };
 
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await logout();
+    } catch (err: any) {
+      console.error("ログアウトエラー:", err);
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '20px' }}>
+        <p>ユーザー情報を読み込み中...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ padding: '20px', border: '1px solid #ff6b6b', borderRadius: '8px', backgroundColor: '#ffe0e0' }}>
+        <h3>認証エラー</h3>
+        <p>{error.message}</p>
+        <button 
+          onClick={handleLogin}
+          style={{ padding: '10px 20px', marginTop: '10px' }}
+        >
+          再度ログインを試す
+        </button>
+      </div>
+    );
+  }
+
+  if (user) {
+    return (
+      <div style={{ padding: '20px', border: '1px solid #4caf50', borderRadius: '8px', backgroundColor: '#e8f5e8' }}>
+        <h2>ようこそ、{user.name || user.preferred_username || user.sub}さん！</h2>
+        
+        <div style={{ margin: '20px 0' }}>
+          <h3>ユーザー情報</h3>
+          <p><strong>メール:</strong> {user.email || 'N/A'}</p>
+          <p><strong>ユーザーID:</strong> {user.sub}</p>
+          <p><strong>メール認証済み:</strong> {user.email_verified ? 'はい' : 'いいえ'}</p>
+          {user.preferred_username && (
+            <p><strong>ユーザー名:</strong> {user.preferred_username}</p>
+          )}
+        </div>
+
+        <div style={{ margin: '20px 0' }}>
+          <h3>トークン情報</h3>
+          <p><strong>アクセストークン状態:</strong> {tokenLoading ? '読み込み中...' : accessToken ? '有効' : '無効'}</p>
+          {accessToken && (
+            <details style={{ marginTop: '10px' }}>
+              <summary style={{ cursor: 'pointer' }}>アクセストークンを表示</summary>
+              <pre style={{ 
+                background: '#f5f5f5', 
+                padding: '10px', 
+                borderRadius: '4px', 
+                fontSize: '12px',
+                wordBreak: 'break-all',
+                maxHeight: '200px',
+                overflow: 'auto'
+              }}>
+                {accessToken}
+              </pre>
+            </details>
+          )}
+        </div>
+
+        <button 
+          onClick={handleLogout}
+          disabled={isLoggingOut}
+          style={{ 
+            padding: '10px 20px', 
+            backgroundColor: '#ff6b6b', 
+            color: 'white', 
+            border: 'none', 
+            borderRadius: '4px',
+            cursor: isLoggingOut ? 'not-allowed' : 'pointer',
+            opacity: isLoggingOut ? 0.6 : 1
+          }}
+        >
+          {isLoggingOut ? 'ログアウト中...' : 'ログアウト'}
+        </button>
+
+        {/* デバッグ用: ユーザーオブジェクト全体を表示 */}
+        <details style={{ marginTop: '20px' }}>
+          <summary style={{ cursor: 'pointer' }}>詳細なユーザー情報 (デバッグ用)</summary>
+          <pre style={{ 
+            background: '#f5f5f5', 
+            padding: '10px', 
+            borderRadius: '4px', 
+            fontSize: '12px',
+            maxHeight: '300px',
+            overflow: 'auto'
+          }}>
+            {JSON.stringify(user, null, 2)}
+          </pre>
+        </details>
+      </div>
+    );
+  }
+
   return (
-    <div>
-      <h1>ようこそ、{user?.name || user?.preferred_username || 'ユーザー'}さん！</h1>
-      <p>メールアドレス: {user?.email}</p>
-      <button onClick={callApi}>保護されたAPIを呼び出す</button>
-      <button onClick={() => logout()}>ログアウト</button>
+    <div style={{ textAlign: 'center', padding: '20px' }}>
+      <p>PlayTuneアカウントでログインしてください。</p>
+      <button 
+        onClick={handleLogin}
+        style={{ 
+          padding: '15px 30px', 
+          backgroundColor: '#007bff', 
+          color: 'white', 
+          border: 'none', 
+          borderRadius: '8px',
+          fontSize: '16px',
+          cursor: 'pointer'
+        }}
+      >
+        PlayTuneでログイン
+      </button>
     </div>
   );
-}
+};
 
 export default UserProfile;
 ```
 
-**3. コールバックページの作成**
+<Callout type="info">
+`useAccessToken` フックを使用することで、アクセストークンの状態をリアルタイムで監視できます。トークンが期限切れになった場合、SDKが自動的にリフレッシュを試行します。
+</Callout>
 
-React Routerなどを使用している場合、コールバック用のルートとコンポーネントを作成します。
+## 7. Routing Configuration
 
-```tsx
-// src/pages/CallbackPage.tsx
-import { useEffect } from 'react';
-import { useAuth } from '@paradigmai/playtune-auth/react';
-import { useNavigate } from 'react-router-dom'; // React Routerの場合
-
-function CallbackPage() {
-  const { handleCallback, isLoading, error } = useAuth();
-  const navigate = useNavigate(); // React Routerの場合
-
-  useEffect(() => {
-    const processCallback = async () => {
-      if (window.location.search.includes('code=')) {
-        try {
-          await handleCallback(window.location.href);
-          navigate('/dashboard'); // 認証成功後にダッシュボードへ遷移
-        } catch (callbackError) {
-          // エラーはuseAuthフックのerrorステートで処理される
-          console.error('コールバック処理中のエラー:', callbackError);
-          navigate('/login-error'); // エラーページへ遷移
-        }
-      } else {
-        // codeパラメータがない場合は、不正なアクセスか、直接アクセスされた可能性
-        navigate('/login');
-      }
-    };
-
-    processCallback();
-  }, [handleCallback, navigate]);
-
-  if (isLoading) {
-    return <div>認証処理中...</div>;
-  }
-
-  if (error) {
-    return <div>認証エラー: {error.message}。ログインページに戻ってください。</div>;
-  }
-
-  return <div>リダイレクトしています...</div>;
-}
-
-export default CallbackPage;
-```
-
-### Next.js での使用 (App Router)
-
-Next.jsでは、ミドルウェアやサーバーコンポーネント、APIルートでSDKを活用できます。
-
-**1. 環境変数の設定**
-
-`.env.local` ファイルに設定を記述します。
-
-```env
-# .env.local
-NEXT_PUBLIC_PLAYTUNE_CLIENT_ID="YOUR_CLIENT_ID"
-NEXT_PUBLIC_PLAYTUNE_ISSUER="https://auth.yourdomain.com"
-NEXT_PUBLIC_PLAYTUNE_REDIRECT_URI="http://localhost:3000/api/auth/callback" # ミドルウェア経由の場合
-PLAYTUNE_CLIENT_SECRET="YOUR_CLIENT_SECRET" # バックエンドで使用する場合 (オプション)
-PLAYTUNE_SESSION_SECRET="COMPLEX_RANDOM_STRING_FOR_SESSION_ENCRYPTION" # ミドルウェアで使用
-```
-
-**2. ミドルウェアによるルート保護 (`middleware.ts`)**
-
-`createAuthMiddleware` を使用して、特定のルートを保護します。
-
-```typescript
-// middleware.ts
-import { createAuthMiddleware } from '@paradigmai/playtune-auth/next';
-
-export default createAuthMiddleware({
-  authConfig: {
-    clientId: process.env.NEXT_PUBLIC_PLAYTUNE_CLIENT_ID!,
-    issuer: process.env.NEXT_PUBLIC_PLAYTUNE_ISSUER!,
-    redirectUri: process.env.NEXT_PUBLIC_PLAYTUNE_REDIRECT_URI!, // コールバックAPIルート
-    scopes: ['openid', 'profile', 'email'],
-  },
-  sessionSecret: process.env.PLAYTUNE_SESSION_SECRET!,
-  protectedRoutes: ['/dashboard/:path*', '/api/protected/:path*'], // 保護するパスのパターン
-  publicRoutes: ['/', '/login', '/api/auth/login', '/api/auth/callback'], // 公開パス
-  loginPath: '/api/auth/login', // ログイン処理を開始するAPIルート
-  debug: process.env.NODE_ENV === 'development',
-});
-
-export const config = {
-  // ミドルウェアを適用するパスを指定 (APIルートや静的ファイルを除く)
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|manifest.json).*)'],
-};
-```
-
-**3. ログイン・コールバックAPIルートの作成**
-
-ミドルウェアが利用するログイン開始とコールバック処理のAPIルートを作成します。
-
-```typescript
-// app/api/auth/login/route.ts
-import { handleLogin } from '@paradigmai/playtune-auth/next/server';
-
-export async function GET(request: Request) {
-  return handleLogin(request, {
-    authConfig: {
-      clientId: process.env.NEXT_PUBLIC_PLAYTUNE_CLIENT_ID!,
-      issuer: process.env.NEXT_PUBLIC_PLAYTUNE_ISSUER!,
-      redirectUri: process.env.NEXT_PUBLIC_PLAYTUNE_REDIRECT_URI!,
-      scopes: ['openid', 'profile', 'email'],
-    },
-    sessionSecret: process.env.PLAYTUNE_SESSION_SECRET!,
-    // loginOptions: { prompt: 'select_account' } // 必要に応じてログインオプションを指定
-  });
-}
-```
-
-```typescript
-// app/api/auth/callback/route.ts
-import { handleCallback } from '@paradigmai/playtune-auth/next/server';
-import { NextResponse } from 'next/server';
-
-export async function GET(request: Request) {
-  return handleCallback(request, {
-    authConfig: {
-      clientId: process.env.NEXT_PUBLIC_PLAYTUNE_CLIENT_ID!,
-      issuer: process.env.NEXT_PUBLIC_PLAYTUNE_ISSUER!,
-      redirectUri: process.env.NEXT_PUBLIC_PLAYTUNE_REDIRECT_URI!,
-    },
-    sessionSecret: process.env.PLAYTUNE_SESSION_SECRET!,
-    async afterCallback(tokens, session) {
-      // コールバック成功後のカスタム処理
-      // 例: ユーザー情報をDBに保存、セッションにカスタム情報を追加など
-      console.log('Callback successful, tokens:', tokens);
-      console.log('Session data:', session.getUser());
-      // 認証後のリダイレクト先を指定
-      return NextResponse.redirect(new URL('/dashboard', request.url));
-    }
-  });
-}
-```
-
-**4. ログアウトAPIルートの作成**
-
-```typescript
-// app/api/auth/logout/route.ts
-import { handleLogout } from '@paradigmai/playtune-auth/next/server';
-import { NextResponse } from 'next/server';
-
-export async function GET(request: Request) {
-  return handleLogout(request, {
-    sessionSecret: process.env.PLAYTUNE_SESSION_SECRET!,
-    async afterLogout() {
-      // ログアウト後のリダイレクト先を指定
-      return NextResponse.redirect(new URL('/', request.url));
-    }
-  });
-}
-```
-
-**5. クライアントコンポーネントでのログイン/ログアウト呼び出し**
+`react-router-dom` を使用して、ホームページとコールバックパスのルーティングを設定します。`src/App.tsx` を編集します。
 
 ```tsx
-// app/components/AuthButton.tsx (Client Component)
-'use client';
+// src/App.tsx
+import React from 'react';
+import { Routes, Route, Link } from 'react-router-dom';
+import UserProfile from './components/UserProfile';
+import AuthCallback from './components/AuthCallback';
+import './App.css';
 
-import { useRouter } from 'next/navigation';
-
-export function LoginButton() {
-  const router = useRouter();
+function HomePage() {
   return (
-    <button onClick={() => router.push('/api/auth/login')}>
-      ログイン
-    </button>
-  );
-}
-
-export function LogoutButton() {
-  const router = useRouter();
-  return (
-    <button onClick={() => router.push('/api/auth/logout')}>
-      ログアウト
-    </button>
-  );
-}
-```
-
-**6. サーバーコンポーネントでのセッション情報取得**
-
-```tsx
-// app/dashboard/page.tsx (Server Component)
-import { getSession } from '@paradigmai/playtune-auth/next/server';
-import { LogoutButton } from '../components/AuthButton'; // 上記のクライアントコンポーネント
-
-export default async function DashboardPage() {
-  const session = await getSession({
-    sessionSecret: process.env.PLAYTUNE_SESSION_SECRET!,
-  });
-
-  const user = session?.getUser();
-
-  if (!user) {
-    // 通常ミドルウェアでリダイレクトされるが、念のため
-    return <p>認証されていません。</p>;
-  }
-
-  return (
-    <div>
-      <h1>ダッシュボード</h1>
-      <p>ようこそ、{user.name || user.preferred_username} さん！</p>
-      <pre>{JSON.stringify(user, null, 2)}</pre>
-      <LogoutButton />
+    <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px' }}>
+      <h1 style={{ textAlign: 'center', marginBottom: '30px' }}>
+        PlayTune Auth SDK デモ
+      </h1>
+      <UserProfile />
     </div>
   );
 }
+
+function ProtectedResourceDemo() {
+  const { useAuthenticatedFetch } = require('@paradigmai/playtune-auth');
+  const authenticatedFetch = useAuthenticatedFetch();
+  const [data, setData] = React.useState(null);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const fetchUserInfo = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // PlayTuneのUserInfoエンドポイントを呼び出す例
+      const response = await authenticatedFetch('https://account.playtune.jp/v1/api/oauth/userinfo');
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status}`);
+      }
+      const userData = await response.json();
+      setData(userData);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px' }}>
+      <h1>保護されたリソースへのアクセス例</h1>
+      <button onClick={fetchUserInfo} disabled={loading}>
+        {loading ? 'APIを呼び出し中...' : 'UserInfo APIを呼び出す'}
+      </button>
+      
+      {error && (
+        <div style={{ color: 'red', margin: '20px 0' }}>
+          エラー: {error}
+        </div>
+      )}
+      
+      {data && (
+        <div style={{ margin: '20px 0' }}>
+          <h3>API レスポンス:</h3>
+          <pre style={{ background: '#f5f5f5', padding: '10px', borderRadius: '4px' }}>
+            {JSON.stringify(data, null, 2)}
+          </pre>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <div className="App">
+      <nav style={{ padding: '10px', backgroundColor: '#f8f9fa', marginBottom: '20px' }}>
+        <Link to="/" style={{ marginRight: '20px', textDecoration: 'none' }}>
+          ホーム
+        </Link>
+        <Link to="/protected" style={{ textDecoration: 'none' }}>
+          API呼び出し例
+        </Link>
+      </nav>
+      
+      <main>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/callback" element={<AuthCallback />} />
+          <Route path="/protected" element={<ProtectedResourceDemo />} />
+        </Routes>
+      </main>
+    </div>
+  );
+}
+
+export default App;
 ```
 
-**7. 保護されたAPIルートの作成**
+<Callout type="warning">
+`/callback` パスは、PlayTuneに登録したリダイレクトURIと完全に一致する必要があります。例えば、登録時に `http://localhost:3000/callback` を指定した場合、このパスでコンポーネントが表示される必要があります。
+</Callout>
 
-`withApiAuth` を使用してAPIルートを保護します。
+## 8. Add Style (Optional)
 
-```typescript
-// app/api/protected/me/route.ts
-import { withApiAuth, type ApiAuthContext } from '@paradigmai/playtune-auth/next/server';
-import { NextResponse } from 'next/server';
+基本的なCSSアニメーションを `src/App.css` に追加して、より良いユーザー体験を提供します。
 
-export const GET = withApiAuth(
-  async (request: Request, context: ApiAuthContext) => {
-    // context.user に認証されたユーザー情報が含まれる
-    // context.accessToken でアクセストークンを取得可能
-    const { user, accessToken } = context;
+```css
+/* src/App.css */
+.App {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
 
-    return NextResponse.json({
-      message: 'これは保護されたAPIエンドポイントです。',
-      user,
-      accessTokenExpiresAt: context.session?.getAccessTokenExpiresAt(),
-    });
-  },
-  { // withApiAuth Options
-    sessionSecret: process.env.PLAYTUNE_SESSION_SECRET!,
-    authConfig: { // オプショナル: トークン検証用の設定 (ミドルウェアと共通化推奨)
-      clientId: process.env.NEXT_PUBLIC_PLAYTUNE_CLIENT_ID!,
-      issuer: process.env.NEXT_PUBLIC_PLAYTUNE_ISSUER!,
-    },
-    // requiredScopes: ['read:profile'], // 特定のスコープが必要な場合
+/* ローディングアニメーション */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* ボタンホバー効果 */
+button {
+  transition: all 0.2s ease-in-out;
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* リンクスタイル */
+nav a {
+  color: #007bff;
+  font-weight: 500;
+}
+
+nav a:hover {
+  color: #0056b3;
+}
+
+/* レスポンシブデザイン */
+@media (max-width: 768px) {
+  .App {
+    padding: 10px;
   }
-);
-```
-
-## トークン管理
-
-SDKは以下のトークン管理機能を提供します。
-
-- `auth.isAuthenticated(): Promise<boolean>`: 現在認証済みかどうかを確認します。
-- `auth.getAccessToken(): Promise<string>`: 有効なアクセストークンを取得します。必要に応じて自動的にリフレッシュします。
-- `auth.getTokenInfo(): Promise<TokenSet | null>`: 現在のトークンセット（アクセストークン、リフレッシュトークン、IDトークンなど）を取得します。
-- `auth.refreshToken(): Promise<TokenResponse>`: 手動でトークンをリフレッシュします。
-- `auth.introspectToken(token?: string): Promise<TokenIntrospection>`: トークンの有効性や情報を確認します（サーバーサイドのイントロスペクションエンドポイントを利用）。
-- `auth.revokeToken(token?: string): Promise<void>`: トークンを無効化します（サーバーサイドのリボケーションエンドポイントを利用）。
-
-## エラーハンドリング
-
-SDKはカスタムエラークラスを提供します。
-
-```typescript
-import {
-  PlaytuneAuthError,
-  TokenExpiredError,
-  AuthenticationRequiredError,
-  InvalidTokenError,
-  InvalidRequestError
-} from '@paradigmai/playtune-auth';
-
-try {
-  // SDKのメソッド呼び出し
-  const accessToken = await auth.getAccessToken();
-} catch (error) {
-  if (error instanceof TokenExpiredError) {
-    console.error('トークンが期限切れです:', error);
-    // 再ログインを促すなどの処理
-  } else if (error instanceof AuthenticationRequiredError) {
-    console.error('認証が必要です:', error);
-    // ログインページへリダイレクト
-  } else if (error instanceof InvalidTokenError) {
-    console.error('無効なトークンです:', error);
-  } else if (error instanceof InvalidRequestError) {
-    console.error('不正なリクエストです:', error.description);
-  } else if (error instanceof PlaytuneAuthError) {
-    console.error('Playtune認証エラー:', error.code, error.description);
-  } else {
-    console.error('不明なエラー:', error);
+  
+  nav {
+    text-align: center;
+  }
+  
+  nav a {
+    display: block;
+    margin: 10px 0;
   }
 }
 ```
 
-## セキュリティ考慮事項
+## 9. Running the Application and Checking Operation
 
-- **HTTPS**: 本番環境では常にHTTPSを使用してください。
-- **リダイレクトURI**: 認証サーバーに登録するリダイレクトURIは、できるだけ厳密に設定してください。
-- **Stateパラメータ**: SDKはCSRF攻撃を防ぐためにstateパラメータを自動的に検証します。
-- **PKCE**: Authorization Code Grantフローでは常にPKCEが使用されます。
-- **トークンストレージ**: ブラウザ環境では`localStorage`がデフォルトですが、よりセキュアなストレージが必要な場合はカスタムストレージを検討してください。Next.jsミドルウェアでは暗号化されたHTTP Only Cookieを使用します。
-- **DPoP**: `enableDPoP: true` を設定することで、DPoPサポートを有効にできます。これにより、トークンが盗まれても第三者が利用することを困難にします。
+### 1. 開発サーバーの起動
 
+```bash
+npm start
+# または (Viteの場合)
+npm run dev
+```
+
+ブラウザで `http://localhost:3000` (またはViteで指定されたポート) が開きます。
+
+### 2. 認証フローのテスト
+
+1. **ログイン開始**:
+   - ホームページの「PlayTuneでログイン」ボタンをクリック
+   - PlayTuneのログインページにリダイレクトされることを確認
+
+2. **PlayTuneでの認証**:
+   - PlayTuneアカウントでログイン
+   - 必要に応じてスコープの許可を行う
+
+3. **コールバック処理**:
+   - 認証後、自動的に `/callback` にリダイレクト
+   - トークン交換処理が実行される
+   - 成功後、ホームページに戻る
+
+4. **ユーザー情報の確認**:
+   - ログイン状態のUIが表示される
+   - ユーザー情報が正しく表示される
+
+5. **保護されたAPI呼び出し**:
+   - "API呼び出し例"ページに移動
+   - "UserInfo APIを呼び出す"ボタンをクリック
+   - 認証されたAPIリクエストが成功することを確認
+
+6. **ログアウト**:
+   - "ログアウト"ボタンをクリック
+   - ログアウト状態に戻ることを確認
+
+<Callout type="success">
+すべてのステップが正常に動作すれば、PlayTune認証の基本実装が完了です！
+</Callout>
+
+## 10. Troubleshooting
+### よくある問題と解決方法
+
+#### 1. リダイレクトURIエラー
+```
+Error: redirect_uri_mismatch
+```
+
+**解決方法**: `authConfig.ts` の `redirectUri` がPlayTuneに登録したものと完全に一致しているか確認してください。
+
+#### 2. CORS エラー
+```
+Access to fetch blocked by CORS policy
+```
+
+**解決方法**: PlayTuneのOAuthエンドポイントは通常CORSを許可していますが、リクエストヘッダーやOriginを確認してください。
+
+#### 3. トークンが自動でリフレッシュされない
+
+**解決方法**: 
+- `offline_access` スコープが含まれているか確認
+- ネットワークタブでリフレッシュリクエストのエラーを確認
+
+#### 4. IndexedDB エラー (Private browsing)
+
+**解決方法**: プライベートブラウジングモードでは IndexedDB が利用できない場合があります。`storage: "sessionStorage"` に変更してテストしてください。
+
+<Callout type="info">
+デバッグ時は、ブラウザの開発者ツールのコンソールとネットワークタブを確認すると、詳細なエラー情報が確認できます。
+</Callout>
+
+## 11. Deployment
+
+### セキュリティ考慮事項
+
+1. **HTTPS の使用**: 本番環境では必ずHTTPSを使用してください
+2. **環境変数の利用**: クライアントIDなどの設定値は環境変数で管理
+3. **CSP ヘッダーの設定**: Content Security Policy で不正なスクリプト実行を防止
+
+### 環境変数の設定例
+
+```typescript
+// src/authConfig.ts (本番版)
+import type { AuthConfig } from "@paradigmai/playtune-auth";
+
+export const authConfig: AuthConfig = {
+  clientId: process.env.REACT_APP_PLAYTUNE_CLIENT_ID || "",
+  redirectUri: process.env.REACT_APP_PLAYTUNE_REDIRECT_URI || "",
+  baseUrl: process.env.REACT_APP_PLAYTUNE_BASE_URL || "https://account.playtune.jp/v1/api",
+  defaultScope: "openid profile email offline_access paradigm.role",
+  storage: "indexedDB",
+  dpopBoundAccessTokens: true,
+  usePkce: true,
+};
+```
+
+### .env ファイル例
+
+```bash
+# .env.local (開発環境)
+REACT_APP_PLAYTUNE_CLIENT_ID=your_development_client_id
+REACT_APP_PLAYTUNE_REDIRECT_URI=http://localhost:3000/callback
+REACT_APP_PLAYTUNE_BASE_URL=https://account.playtune.jp/v1/api
+
+# .env.production (本番環境)
+REACT_APP_PLAYTUNE_CLIENT_ID=your_production_client_id
+REACT_APP_PLAYTUNE_REDIRECT_URI=https://yourdomain.com/callback
+REACT_APP_PLAYTUNE_BASE_URL=https://account.playtune.jp/v1/api
+```
+
+<Callout type="warning">
+`.env` ファイルは `.gitignore` に追加して、機密情報がリポジトリにコミットされないようにしてください。
+</Callout>
+
+## 12. Next Step
+
+基本的な認証フローが動作したら、以下の拡張機能を検討してください：
+
+- **エラーハンドリングの強化**: より詳細なエラーメッセージとリカバリー機能
+- **ユーザー権限管理**: スコープやロールベースのアクセス制御
+- **オフライン対応**: サービスワーカーでのトークンキャッシュ
+- **セキュリティ監査**: トークンの使用状況ログとセキュリティイベント追跡
+
+---
+
+これで、`@paradigmai/playtune-auth` SDKを使用した基本的な認証フローの実装が完了です。このガイドを元に、アプリケーションの要件に合わせてさらに機能を拡張してください。

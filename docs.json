@@ -39,8 +39,14 @@
         "group": "アカウント認証",
         "pages": [
           "oauth",
-          "oauth_flow",
-          "sdk"
+          "oauth_flow"
+        ]
+      },
+      {
+        "group": "SDK",
+        "pages": [
+          "sdk",
+          "sdk_dev"
         ]
       }
     ]
